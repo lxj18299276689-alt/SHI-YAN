@@ -182,6 +182,17 @@
       opacity: 0; pointer-events: none; transition: .25s ease;
     }
     .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .auth-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 22px; padding: 5px; border-radius: 13px; background: var(--soft); }
+    .auth-tab { min-height: 40px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font: inherit; font-weight: 800; cursor: pointer; }
+    .auth-tab.active { color: var(--ink); background: white; box-shadow: 0 3px 12px rgba(31, 48, 100, .08); }
+    .auth-error { min-height: 22px; margin: -5px 0 12px; color: #d93f37; font-size: 13px; }
+    .auth-submit { width: 100%; min-height: 48px; }
+    .user-menu { position: relative; }
+    .user-chip { gap: 8px; }
+    .user-avatar { width: 27px; height: 27px; display: grid; place-items: center; border-radius: 50%; color: white; background: var(--blue); font-size: 12px; }
+    .logout-card { position: absolute; right: 0; top: calc(100% + 8px); z-index: 12; width: 150px; padding: 8px; border: 1px solid var(--line); border-radius: 13px; background: white; box-shadow: var(--shadow); }
+    .logout-card button { width: 100%; padding: 9px 10px; border: 0; border-radius: 9px; background: transparent; color: #d93f37; text-align: left; font: inherit; cursor: pointer; }
+    .logout-card button:hover { background: #fff1f0; }
 
     #discover-dialog { width: min(1080px, calc(100% - 28px)); }
     .discover-shell { min-height: 650px; }
@@ -226,7 +237,8 @@
     @media (max-width: 620px) {
       .shell { width: min(100% - 28px, 1180px); }
       header { height: 68px; }
-      .nav-actions .btn:first-child { display: none; }
+      .nav-actions { gap: 6px; }
+      .nav-actions .btn { padding: 0 12px; }
       h1 { font-size: 46px; }
       .lead { font-size: 16px; }
       .hero-actions { align-items: stretch; flex-direction: column; }
@@ -258,7 +270,14 @@
     <nav class="shell" aria-label="主导航">
       <div class="brand"><span class="brand-mark">⌁</span>凑局儿</div>
       <div class="nav-links"><button class="nav-link" type="button" data-open-discover>发现组局</button><button class="nav-link" type="button" data-open-discover>兴趣分类</button><span>校园指南</span></div>
-      <div class="nav-actions"><button class="btn" type="button">登录</button><button class="btn primary" type="button" data-open-publish>发布组局</button></div>
+      <div class="nav-actions">
+        <button class="btn" id="login-button" type="button" data-open-auth>登录 / 注册</button>
+        <div class="user-menu" id="user-menu" hidden>
+          <button class="btn user-chip" id="user-chip" type="button"><span class="user-avatar" id="user-avatar"></span><span id="user-name"></span></button>
+          <div class="logout-card" id="logout-card" hidden><button id="logout-button" type="button">退出登录</button></div>
+        </div>
+        <button class="btn primary" type="button" data-open-publish>发布组局</button>
+      </div>
     </nav>
   </header>
 
@@ -363,6 +382,35 @@
     </section>
   </main>
 
+  <dialog id="auth-dialog" aria-labelledby="auth-title">
+    <div class="modal-head">
+      <div><h2 id="auth-title">欢迎来到凑局儿</h2><p>登录后即可发布和管理自己的组局。</p></div>
+      <button class="close-btn" type="button" aria-label="关闭登录窗口" data-close-auth>×</button>
+    </div>
+    <div class="publish-form">
+      <div class="auth-tabs">
+        <button class="auth-tab active" type="button" data-auth-mode="login">登录</button>
+        <button class="auth-tab" type="button" data-auth-mode="register">注册</button>
+      </div>
+      <form id="login-form">
+        <div class="field"><label for="login-email">邮箱 <span class="required">*</span></label><input id="login-email" name="email" type="email" autocomplete="email" placeholder="请输入邮箱" required></div>
+        <div class="field"><label for="login-password">密码 <span class="required">*</span></label><input id="login-password" name="password" type="password" minlength="6" autocomplete="current-password" placeholder="至少 6 位字符" required></div>
+        <p class="auth-error" id="login-error" role="alert"></p>
+        <button class="btn primary auth-submit" type="submit">登录</button>
+      </form>
+      <form id="register-form" hidden>
+        <div class="field"><label for="register-name">昵称 <span class="required">*</span></label><input id="register-name" name="nickname" type="text" maxlength="12" autocomplete="nickname" placeholder="大家会看到这个名字" required></div>
+        <div class="field"><label for="register-email">邮箱 <span class="required">*</span></label><input id="register-email" name="email" type="email" autocomplete="email" placeholder="请输入邮箱" required></div>
+        <div class="field-row">
+          <div class="field"><label for="register-password">设置密码 <span class="required">*</span></label><input id="register-password" name="password" type="password" minlength="6" autocomplete="new-password" placeholder="至少 6 位字符" required></div>
+          <div class="field"><label for="register-confirm">确认密码 <span class="required">*</span></label><input id="register-confirm" name="confirm" type="password" minlength="6" autocomplete="new-password" placeholder="再次输入密码" required></div>
+        </div>
+        <p class="auth-error" id="register-error" role="alert"></p>
+        <button class="btn primary auth-submit" type="submit">创建账号并登录</button>
+      </form>
+    </div>
+  </dialog>
+
   <dialog id="discover-dialog" aria-labelledby="discover-title">
     <div class="discover-shell">
       <div class="modal-head">
@@ -447,11 +495,18 @@
   <script>
     const publishDialog = document.getElementById('publish-dialog');
     const discoverDialog = document.getElementById('discover-dialog');
+    const authDialog = document.getElementById('auth-dialog');
     const form = document.getElementById('publish-form');
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
     const timeInput = document.getElementById('activity-time');
     const eventList = document.getElementById('event-list');
     const toast = document.getElementById('publish-toast');
     const storageKey = 'coujuer-published-events';
+    const usersKey = 'coujuer-users';
+    const sessionKey = 'coujuer-session';
+    let currentUser = null;
+    let publishAfterLogin = false;
 
     const activityCatalog = {
       '运动搭子': [['羽毛球', '🏸', 12], ['篮球', '🏀', 9], ['夜跑', '🏃', 7], ['飞盘', '🥏', 6], ['乒乓球', '🏓', 8], ['健身', '💪', 5]],
@@ -500,10 +555,78 @@
     }
 
     function openPublish() {
+      if (!currentUser) {
+        publishAfterLogin = true;
+        if (discoverDialog.open) discoverDialog.close();
+        openAuth('login');
+        return;
+      }
       setMinimumTime();
       if (discoverDialog.open) discoverDialog.close();
       publishDialog.showModal();
       setTimeout(() => document.getElementById('activity-title').focus(), 0);
+    }
+
+    async function hashPassword(password) {
+      const bytes = new TextEncoder().encode(password);
+      const digest = await crypto.subtle.digest('SHA-256', bytes);
+      return Array.from(new Uint8Array(digest)).map(value => value.toString(16).padStart(2, '0')).join('');
+    }
+
+    function getUsers() {
+      try { return JSON.parse(localStorage.getItem(usersKey) || '[]'); } catch (_) { return []; }
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2200);
+    }
+
+    function switchAuthMode(mode) {
+      const isLogin = mode === 'login';
+      loginForm.hidden = !isLogin;
+      registerForm.hidden = isLogin;
+      document.querySelectorAll('[data-auth-mode]').forEach(tab => tab.classList.toggle('active', tab.dataset.authMode === mode));
+      document.getElementById('login-error').textContent = '';
+      document.getElementById('register-error').textContent = '';
+    }
+
+    function openAuth(mode = 'login') {
+      switchAuthMode(mode);
+      authDialog.showModal();
+      const field = mode === 'login' ? document.getElementById('login-email') : document.getElementById('register-name');
+      setTimeout(() => field.focus(), 0);
+    }
+
+    function updateAuthUI() {
+      const loginButton = document.getElementById('login-button');
+      const userMenu = document.getElementById('user-menu');
+      loginButton.hidden = Boolean(currentUser);
+      userMenu.hidden = !currentUser;
+      if (currentUser) {
+        document.getElementById('user-name').textContent = currentUser.nickname;
+        document.getElementById('user-avatar').textContent = currentUser.nickname.slice(0, 1);
+      }
+    }
+
+    function completeLogin(user, message) {
+      currentUser = { email: user.email, nickname: user.nickname };
+      localStorage.setItem(sessionKey, JSON.stringify(currentUser));
+      updateAuthUI();
+      authDialog.close();
+      loginForm.reset();
+      registerForm.reset();
+      showToast(message);
+      if (publishAfterLogin) {
+        publishAfterLogin = false;
+        setTimeout(openPublish, 280);
+      }
+    }
+
+    function loadSession() {
+      try { currentUser = JSON.parse(localStorage.getItem(sessionKey) || 'null'); } catch (_) { currentUser = null; }
+      updateAuthUI();
     }
 
     function getGroups(activity, category) {
@@ -587,7 +710,7 @@
         <div class="event-body">
           <h3>${escapeHTML(item.title)}</h3>
           <div class="meta"><span>🗓️ <b>${escapeHTML(formatTime(item.time))}</b></span><span>📍 ${escapeHTML(item.location)}</span><span>👥 <b>${escapeHTML(gender)}</b></span>${item.note ? `<span>💬 ${escapeHTML(item.note)}</span>` : ''}</div>
-          <div class="event-foot"><div class="host"><span class="host-avatar">我</span><span>我发起的组局</span></div><span class="seats">1 / ${escapeHTML(item.size)} 人</span></div>
+          <div class="event-foot"><div class="host"><span class="host-avatar">${escapeHTML((item.host || '我').slice(0, 1))}</span><span>${escapeHTML(item.host || '我')}发起</span></div><span class="seats">1 / ${escapeHTML(item.size)} 人</span></div>
         </div>`;
       prepend ? eventList.prepend(card) : eventList.append(card);
     }
@@ -608,21 +731,65 @@
       document.getElementById('group-view').hidden = true;
     });
 
+    document.querySelectorAll('[data-open-auth]').forEach(button => button.addEventListener('click', () => openAuth('login')));
+    document.querySelector('[data-close-auth]').addEventListener('click', () => { publishAfterLogin = false; authDialog.close(); });
+    authDialog.addEventListener('click', event => { if (event.target === authDialog) { publishAfterLogin = false; authDialog.close(); } });
+    document.querySelectorAll('[data-auth-mode]').forEach(tab => tab.addEventListener('click', () => switchAuthMode(tab.dataset.authMode)));
+
+    loginForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      const data = Object.fromEntries(new FormData(loginForm));
+      const passwordHash = await hashPassword(data.password);
+      const user = getUsers().find(item => item.email.toLowerCase() === data.email.trim().toLowerCase() && item.passwordHash === passwordHash);
+      if (!user) {
+        document.getElementById('login-error').textContent = '邮箱或密码不正确，请重新输入。';
+        return;
+      }
+      completeLogin(user, `欢迎回来，${user.nickname}`);
+    });
+
+    registerForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      const data = Object.fromEntries(new FormData(registerForm));
+      const error = document.getElementById('register-error');
+      if (data.password !== data.confirm) { error.textContent = '两次输入的密码不一致。'; return; }
+      const users = getUsers();
+      const email = data.email.trim().toLowerCase();
+      if (users.some(item => item.email.toLowerCase() === email)) { error.textContent = '该邮箱已经注册，请直接登录。'; return; }
+      const user = { nickname: data.nickname.trim(), email, passwordHash: await hashPassword(data.password) };
+      users.push(user);
+      localStorage.setItem(usersKey, JSON.stringify(users));
+      completeLogin(user, `注册成功，欢迎你，${user.nickname}`);
+    });
+
+    document.getElementById('user-chip').addEventListener('click', () => {
+      const card = document.getElementById('logout-card');
+      card.hidden = !card.hidden;
+    });
+    document.getElementById('logout-button').addEventListener('click', () => {
+      localStorage.removeItem(sessionKey);
+      currentUser = null;
+      document.getElementById('logout-card').hidden = true;
+      updateAuthUI();
+      showToast('已退出登录');
+    });
+
     form.addEventListener('submit', event => {
       event.preventDefault();
       if (!form.reportValidity()) return;
       const data = Object.fromEntries(new FormData(form));
+      data.host = currentUser.nickname;
       const items = JSON.parse(localStorage.getItem(storageKey) || '[]');
       items.unshift(data);
       localStorage.setItem(storageKey, JSON.stringify(items.slice(0, 20)));
       renderEvent(data, true);
       form.reset();
       publishDialog.close();
-      toast.classList.add('show');
-      setTimeout(() => toast.classList.remove('show'), 2200);
+      showToast('组局发布成功');
       document.getElementById('event-list').scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
 
+    loadSession();
     loadPublishedEvents();
   </script>
 </body>
